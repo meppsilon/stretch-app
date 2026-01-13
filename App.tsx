@@ -6,12 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  ActivityIndicator,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 
 import { Stretch, Filters } from "./types";
-import { stretches, filterStretches, getRandomStretch } from "./data/stretches";
+import { useStretches } from "./hooks/useStretches";
 import { useTimer } from "./hooks/useTimer";
 import { useFavorites } from "./hooks/useFavorites";
 import { StretchCard } from "./components/StretchCard";
@@ -28,16 +29,24 @@ export default function App() {
   });
   const [showFavorites, setShowFavorites] = useState(false);
 
+  const {
+    stretches,
+    muscleGroups,
+    isLoading,
+    error,
+    filterStretches,
+    getRandomStretch,
+  } = useStretches();
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
 
   const filteredStretches = useMemo(
-    () => filterStretches(stretches, filters),
-    [filters]
+    () => filterStretches(filters),
+    [filters, filterStretches]
   );
 
   const favoriteStretches = useMemo(
     () => stretches.filter((s) => favorites.includes(s.name)),
-    [favorites]
+    [stretches, favorites]
   );
 
   const timer = useTimer(currentStretch?.seconds ?? 0);
@@ -65,11 +74,24 @@ export default function App() {
       >
         <Text style={styles.title}>Stretch</Text>
 
-        <FilterSection
-          filters={filters}
-          onFiltersChange={setFilters}
-          matchCount={filteredStretches.length}
-        />
+        {isLoading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color="#6366f1" />
+            <Text style={styles.loadingText}>Loading stretches...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorState}>
+            <Text style={styles.errorEmoji}>⚠️</Text>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : (
+          <>
+            <FilterSection
+              filters={filters}
+              onFiltersChange={setFilters}
+              matchCount={filteredStretches.length}
+              muscleGroups={muscleGroups}
+            />
 
         {currentStretch ? (
           <>
@@ -135,6 +157,8 @@ export default function App() {
             </View>
           )}
         </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -177,6 +201,37 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 16,
     color: "#64748b",
+    textAlign: "center",
+  },
+  loadingState: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 40,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#64748b",
+    marginTop: 16,
+  },
+  errorState: {
+    backgroundColor: "#fef2f2",
+    borderRadius: 16,
+    padding: 40,
+    alignItems: "center",
+  },
+  errorEmoji: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#dc2626",
     textAlign: "center",
   },
   newStretchButton: {

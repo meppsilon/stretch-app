@@ -9,18 +9,19 @@ import {
   Pressable,
 } from "react-native";
 import { Filters } from "../types";
-import { muscleGroups } from "../data/stretches";
 
 interface FilterSectionProps {
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
   matchCount: number;
+  muscleGroups: string[];
 }
 
 export function FilterSection({
   filters,
   onFiltersChange,
   matchCount,
+  muscleGroups,
 }: FilterSectionProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMuscleModal, setShowMuscleModal] = useState(false);

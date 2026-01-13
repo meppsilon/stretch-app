@@ -1,5 +1,7 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from "react-native";
+import Svg, { Circle } from "react-native-svg";
+import { Audio } from "expo-av";
 import { TimerState } from "../types";
 
 interface TimerProps {
@@ -11,6 +13,13 @@ interface TimerProps {
   onReset: () => void;
 }
 
+const CIRCLE_SIZE = 200;
+const STROKE_WIDTH = 12;
+const RADIUS = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
 export function Timer({
   timeRemaining,
   timerState,
@@ -19,6 +28,82 @@ export function Timer({
   onPause,
   onReset,
 }: TimerProps) {
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const animatedProgress = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Animate the progress smoothly - use 1000ms with linear easing to match tick interval
+  useEffect(() => {
+    Animated.timing(animatedProgress, {
+      toValue: progress,
+      duration: timerState === "running" ? 1000 : 300,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+  }, [progress, animatedProgress, timerState]);
+
+  // Pulse animation when finished
+  useEffect(() => {
+    if (timerState === "finished") {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.05,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [timerState, pulseAnim]);
+
+  // Play sound when timer finishes
+  useEffect(() => {
+    if (timerState === "finished") {
+      playCompletionSound();
+    }
+  }, [timerState]);
+
+  // Cleanup sound on unmount
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
+
+  const playCompletionSound = async () => {
+    try {
+      // Unload previous sound if exists
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+      }
+
+      // Set audio mode for playback
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+      });
+
+      // Use a pleasant chime sound from a CDN
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: "https://cdn.freesound.org/previews/536/536420_4921277-lq.mp3" },
+        { shouldPlay: true, volume: 0.8 }
+      );
+      soundRef.current = sound;
+    } catch (error) {
+      // Fallback: use haptics
+      console.log("Could not play sound, using haptics:", error);
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -51,25 +136,57 @@ export function Timer({
     }
   };
 
+  const strokeDashoffset = animatedProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [CIRCUMFERENCE, 0],
+  });
+
+  const statusColor = getStatusColor();
+
   return (
     <View style={styles.container}>
-      <View style={styles.timerDisplay}>
-        <Text style={[styles.time, { color: getStatusColor() }]}>
-          {formatTime(timeRemaining)}
-        </Text>
-        <Text style={[styles.status, { color: getStatusColor() }]}>
-          {getStatusText()}
-        </Text>
-      </View>
+      <Animated.View
+        style={[
+          styles.circleContainer,
+          { transform: [{ scale: pulseAnim }] },
+        ]}
+      >
+        <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={styles.svg}>
+          {/* Background circle */}
+          <Circle
+            cx={CIRCLE_SIZE / 2}
+            cy={CIRCLE_SIZE / 2}
+            r={RADIUS}
+            stroke="#e2e8f0"
+            strokeWidth={STROKE_WIDTH}
+            fill="none"
+          />
+          {/* Progress circle */}
+          <AnimatedCircle
+            cx={CIRCLE_SIZE / 2}
+            cy={CIRCLE_SIZE / 2}
+            r={RADIUS}
+            stroke={statusColor}
+            strokeWidth={STROKE_WIDTH}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={strokeDashoffset}
+            rotation="-90"
+            origin={`${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2}`}
+          />
+        </Svg>
 
-      <View style={styles.progressBarContainer}>
-        <View
-          style={[
-            styles.progressBar,
-            { width: `${progress * 100}%`, backgroundColor: getStatusColor() },
-          ]}
-        />
-      </View>
+        {/* Time display in center */}
+        <View style={styles.timeContainer}>
+          <Text style={[styles.time, { color: statusColor }]}>
+            {formatTime(timeRemaining)}
+          </Text>
+          <Text style={[styles.status, { color: statusColor }]}>
+            {getStatusText()}
+          </Text>
+        </View>
+      </Animated.View>
 
       <View style={styles.buttonContainer}>
         {timerState === "running" ? (
@@ -77,7 +194,7 @@ export function Timer({
             style={[styles.button, styles.pauseButton]}
             onPress={onPause}
           >
-            <Text style={styles.buttonText}>Pause</Text>
+            <Text style={styles.buttonText}>⏸ Pause</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -85,7 +202,7 @@ export function Timer({
             onPress={onStart}
           >
             <Text style={styles.buttonText}>
-              {timerState === "finished" ? "Restart" : "Start"}
+              {timerState === "finished" ? "🔄 Restart" : "▶️ Start"}
             </Text>
           </TouchableOpacity>
         )}
@@ -105,19 +222,29 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: "#fff",
     borderRadius: 16,
-    padding: 20,
+    padding: 24,
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
-  timerDisplay: {
+  circleContainer: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 24,
+  },
+  svg: {
+    position: "absolute",
+  },
+  timeContainer: {
+    alignItems: "center",
   },
   time: {
-    fontSize: 48,
+    fontSize: 44,
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
   },
@@ -128,20 +255,10 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
   },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: "#e2e8f0",
-    borderRadius: 4,
-    overflow: "hidden",
-    marginBottom: 20,
-  },
-  progressBar: {
-    height: "100%",
-    borderRadius: 4,
-  },
   buttonContainer: {
     flexDirection: "row",
     gap: 12,
+    width: "100%",
   },
   button: {
     flex: 1,
