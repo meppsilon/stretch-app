@@ -1,4 +1,5 @@
 export interface Stretch {
+  id: number;
   name: string;
   muscleGroups: string[];
   seconds: number;
@@ -8,10 +9,12 @@ export interface Stretch {
 }
 
 export interface Filters {
-  muscleGroup: string | null;
+  muscleGroups: string[];
   minSeconds: number | null;
   maxSeconds: number | null;
   type: "all" | "dynamic" | "static";
 }
 
 export type TimerState = "idle" | "running" | "paused" | "finished";
+
+export type ReactionType = "love" | "like" | "dislike" | "hate" | null;

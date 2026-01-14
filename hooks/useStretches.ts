@@ -67,6 +67,7 @@ export function useStretches(): UseStretchesReturn {
           .filter((name): name is string => Boolean(name));
 
         return {
+          id: row.id,
           name: row.name,
           muscleGroups: muscleGroupNames,
           seconds: row.seconds,
@@ -94,9 +95,9 @@ export function useStretches(): UseStretchesReturn {
     (filters: Filters): Stretch[] => {
       let result = stretches;
 
-      if (filters.muscleGroup) {
+      if (filters.muscleGroups.length > 0) {
         result = result.filter((s) =>
-          s.muscleGroups.includes(filters.muscleGroup!)
+          filters.muscleGroups.some((group) => s.muscleGroups.includes(group))
         );
       }
 

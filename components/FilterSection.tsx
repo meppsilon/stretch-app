@@ -32,9 +32,17 @@ export function FilterSection({
     onFiltersChange({ ...filters, [key]: value });
   };
 
+  const toggleMuscleGroup = (group: string) => {
+    const currentGroups = filters.muscleGroups;
+    const newGroups = currentGroups.includes(group)
+      ? currentGroups.filter((g) => g !== group)
+      : [...currentGroups, group];
+    updateFilter("muscleGroups", newGroups);
+  };
+
   const clearFilters = () => {
     onFiltersChange({
-      muscleGroup: null,
+      muscleGroups: [],
       minSeconds: null,
       maxSeconds: null,
       type: "all",
@@ -42,10 +50,20 @@ export function FilterSection({
   };
 
   const hasActiveFilters =
-    filters.muscleGroup !== null ||
+    filters.muscleGroups.length > 0 ||
     filters.minSeconds !== null ||
     filters.maxSeconds !== null ||
     filters.type !== "all";
+
+  const getMuscleGroupDisplayText = () => {
+    if (filters.muscleGroups.length === 0) {
+      return "All";
+    } else if (filters.muscleGroups.length === 1) {
+      return filters.muscleGroups[0];
+    } else {
+      return `${filters.muscleGroups.length} selected`;
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -67,13 +85,16 @@ export function FilterSection({
         <View style={styles.content}>
           {/* Muscle Group Picker */}
           <View style={styles.filterRow}>
-            <Text style={styles.filterLabel}>Muscle Group</Text>
+            <Text style={styles.filterLabel}>Muscle Groups</Text>
             <TouchableOpacity
               style={styles.pickerButton}
               onPress={() => setShowMuscleModal(true)}
             >
-              <Text style={styles.pickerText}>
-                {filters.muscleGroup || "All"}
+              <Text style={[
+                styles.pickerText,
+                filters.muscleGroups.length > 0 && styles.pickerTextActive
+              ]}>
+                {getMuscleGroupDisplayText()}
               </Text>
               <Text style={styles.pickerChevron}>▼</Text>
             </TouchableOpacity>
@@ -125,52 +146,65 @@ export function FilterSection({
           style={styles.modalOverlay}
           onPress={() => setShowMuscleModal(false)}
         >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Muscle Group</Text>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Muscle Groups</Text>
+              <TouchableOpacity
+                style={styles.doneButton}
+                onPress={() => setShowMuscleModal(false)}
+              >
+                <Text style={styles.doneButtonText}>Done</Text>
+              </TouchableOpacity>
+            </View>
             <ScrollView style={styles.modalScroll}>
               <TouchableOpacity
                 style={[
                   styles.modalOption,
-                  filters.muscleGroup === null && styles.modalOptionActive,
+                  filters.muscleGroups.length === 0 && styles.modalOptionActive,
                 ]}
                 onPress={() => {
-                  updateFilter("muscleGroup", null);
-                  setShowMuscleModal(false);
+                  updateFilter("muscleGroups", []);
                 }}
               >
                 <Text
                   style={[
                     styles.modalOptionText,
-                    filters.muscleGroup === null && styles.modalOptionTextActive,
+                    filters.muscleGroups.length === 0 && styles.modalOptionTextActive,
                   ]}
                 >
                   All
                 </Text>
+                {filters.muscleGroups.length === 0 && (
+                  <Text style={styles.checkmark}>✓</Text>
+                )}
               </TouchableOpacity>
-              {muscleGroups.map((group) => (
-                <TouchableOpacity
-                  key={group}
-                  style={[
-                    styles.modalOption,
-                    filters.muscleGroup === group && styles.modalOptionActive,
-                  ]}
-                  onPress={() => {
-                    updateFilter("muscleGroup", group);
-                    setShowMuscleModal(false);
-                  }}
-                >
-                  <Text
+              {muscleGroups.map((group) => {
+                const isSelected = filters.muscleGroups.includes(group);
+                return (
+                  <TouchableOpacity
+                    key={group}
                     style={[
-                      styles.modalOptionText,
-                      filters.muscleGroup === group && styles.modalOptionTextActive,
+                      styles.modalOption,
+                      isSelected && styles.modalOptionActive,
                     ]}
+                    onPress={() => toggleMuscleGroup(group)}
                   >
-                    {group}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                    <Text
+                      style={[
+                        styles.modalOptionText,
+                        isSelected && styles.modalOptionTextActive,
+                      ]}
+                    >
+                      {group}
+                    </Text>
+                    {isSelected && (
+                      <Text style={styles.checkmark}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
     </View>
@@ -248,6 +282,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#1a1a1a",
   },
+  pickerTextActive: {
+    color: "#6366f1",
+    fontWeight: "600",
+  },
   pickerChevron: {
     fontSize: 12,
     color: "#64748b",
@@ -301,14 +339,29 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: "60%",
   },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: "#1a1a1a",
-    padding: 20,
-    textAlign: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
+  },
+  doneButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#6366f1",
+    borderRadius: 8,
+  },
+  doneButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#fff",
   },
   modalScroll: {
     padding: 8,
@@ -316,6 +369,9 @@ const styles = StyleSheet.create({
   modalOption: {
     padding: 16,
     borderRadius: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   modalOptionActive: {
     backgroundColor: "#eef2ff",
@@ -327,5 +383,10 @@ const styles = StyleSheet.create({
   modalOptionTextActive: {
     color: "#6366f1",
     fontWeight: "600",
+  },
+  checkmark: {
+    fontSize: 18,
+    color: "#6366f1",
+    fontWeight: "700",
   },
 });

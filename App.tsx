@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,24 +10,44 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
+import { ClerkProvider, ClerkLoaded, SignedIn, SignedOut, useUser, useClerk } from "@clerk/clerk-expo";
 
-import { Stretch, Filters } from "./types";
+import { tokenCache } from "./lib/tokenCache";
+import { Stretch, Filters, TimerState, ReactionType } from "./types";
 import { useStretches } from "./hooks/useStretches";
 import { useTimer } from "./hooks/useTimer";
-import { useFavorites } from "./hooks/useFavorites";
+import { useReactions } from "./hooks/useReactions";
+import { useStretchHistory } from "./hooks/useStretchHistory";
 import { StretchCard } from "./components/StretchCard";
 import { Timer } from "./components/Timer";
 import { FilterSection } from "./components/FilterSection";
+import { SignInScreen } from "./components/SignInScreen";
+import { SignUpScreen } from "./components/SignUpScreen";
 
-export default function App() {
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+
+function AuthScreens() {
+  const [showSignUp, setShowSignUp] = useState(false);
+
+  if (showSignUp) {
+    return <SignUpScreen onSwitchToSignIn={() => setShowSignUp(false)} />;
+  }
+
+  return <SignInScreen onSwitchToSignUp={() => setShowSignUp(true)} />;
+}
+
+function MainApp() {
+  const { user } = useUser();
+  const { signOut } = useClerk();
+
   const [currentStretch, setCurrentStretch] = useState<Stretch | null>(null);
   const [filters, setFilters] = useState<Filters>({
-    muscleGroup: null,
+    muscleGroups: [],
     minSeconds: null,
     maxSeconds: null,
     type: "all",
   });
-  const [showFavorites, setShowFavorites] = useState(false);
+  const [showLoved, setShowLoved] = useState(false);
 
   const {
     stretches,
@@ -37,32 +57,74 @@ export default function App() {
     filterStretches,
     getRandomStretch,
   } = useStretches();
-  const { favorites, isFavorite, toggleFavorite } = useFavorites();
+  const { getReaction, setReaction, getStretchesByReaction } = useReactions(user?.id);
+  const stretchHistory = useStretchHistory(user?.id);
+  const prevTimerStateRef = useRef<TimerState>("idle");
 
   const filteredStretches = useMemo(
     () => filterStretches(filters),
     [filters, filterStretches]
   );
 
-  const favoriteStretches = useMemo(
-    () => stretches.filter((s) => favorites.includes(s.name)),
-    [stretches, favorites]
+  const lovedStretchIds = getStretchesByReaction("love");
+  const lovedStretches = useMemo(
+    () => stretches.filter((s) => lovedStretchIds.includes(s.id)),
+    [stretches, lovedStretchIds]
   );
 
   const timer = useTimer(currentStretch?.seconds ?? 0);
 
+  // Track timer state changes for history
+  useEffect(() => {
+    const prevState = prevTimerStateRef.current;
+    const currentState = timer.timerState;
+
+    if (prevState !== currentState && currentStretch) {
+      if (currentState === "running" && prevState === "idle") {
+        // Started a new session
+        stretchHistory.startSession(currentStretch.id);
+      } else if (currentState === "paused") {
+        // Paused
+        stretchHistory.updateStatus("paused");
+      } else if (currentState === "running" && prevState === "paused") {
+        // Resumed from pause
+        stretchHistory.updateStatus("started");
+      } else if (currentState === "finished") {
+        // Completed
+        stretchHistory.completeSession();
+      }
+    }
+
+    prevTimerStateRef.current = currentState;
+  }, [timer.timerState, currentStretch, stretchHistory]);
+
   const handleNewStretch = () => {
+    // Abandon current session if timer was running
+    if (currentStretch && (timer.timerState === "running" || timer.timerState === "paused")) {
+      stretchHistory.abandonSession();
+    }
+
     const stretch = getRandomStretch(filteredStretches);
     setCurrentStretch(stretch);
     timer.reset();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
-  const handleSelectFavorite = (stretch: Stretch) => {
+  const handleSelectLoved = (stretch: Stretch) => {
+    // Abandon current session if timer was running
+    if (currentStretch && (timer.timerState === "running" || timer.timerState === "paused")) {
+      stretchHistory.abandonSession();
+    }
+
     setCurrentStretch(stretch);
     timer.reset();
-    setShowFavorites(false);
+    setShowLoved(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   return (
@@ -72,7 +134,12 @@ export default function App() {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
       >
-        <Text style={styles.title}>Stretch</Text>
+        <View style={styles.header}>
+          <Text style={styles.title}>Stretch</Text>
+          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
 
         {isLoading ? (
           <View style={styles.loadingState}>
@@ -93,74 +160,89 @@ export default function App() {
               muscleGroups={muscleGroups}
             />
 
-        {currentStretch ? (
-          <>
-            <StretchCard
-              stretch={currentStretch}
-              isFavorite={isFavorite(currentStretch.name)}
-              onToggleFavorite={() => toggleFavorite(currentStretch.name)}
-            />
-            <Timer
-              timeRemaining={timer.timeRemaining}
-              timerState={timer.timerState}
-              progress={timer.progress}
-              onStart={timer.start}
-              onPause={timer.pause}
-              onReset={timer.reset}
-            />
-          </>
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateEmoji}>🧘</Text>
-            <Text style={styles.emptyStateText}>
-              Tap the button below to get a random stretch
-            </Text>
-          </View>
-        )}
-
-        <TouchableOpacity style={styles.newStretchButton} onPress={handleNewStretch}>
-          <Text style={styles.newStretchButtonText}>🎲 New Stretch</Text>
-        </TouchableOpacity>
-
-        {/* Favorites Section */}
-        <View style={styles.favoritesSection}>
-          <TouchableOpacity
-            style={styles.favoritesHeader}
-            onPress={() => setShowFavorites(!showFavorites)}
-          >
-            <Text style={styles.favoritesTitle}>
-              ❤️ Favorites ({favorites.length})
-            </Text>
-            <Text style={styles.chevron}>{showFavorites ? "▲" : "▼"}</Text>
-          </TouchableOpacity>
-
-          {showFavorites && (
-            <View style={styles.favoritesList}>
-              {favoriteStretches.length === 0 ? (
-                <Text style={styles.noFavorites}>
-                  No favorites yet. Tap the heart on a stretch to add it!
+            {currentStretch ? (
+              <>
+                <StretchCard
+                  stretch={currentStretch}
+                  reaction={getReaction(currentStretch.id)}
+                  onReaction={(reaction: ReactionType) => setReaction(currentStretch.id, reaction)}
+                />
+                <Timer
+                  timeRemaining={timer.timeRemaining}
+                  timerState={timer.timerState}
+                  progress={timer.progress}
+                  onStart={timer.start}
+                  onPause={timer.pause}
+                  onReset={timer.reset}
+                />
+              </>
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateEmoji}>🧘</Text>
+                <Text style={styles.emptyStateText}>
+                  Tap the button below to get a random stretch
                 </Text>
-              ) : (
-                favoriteStretches.map((stretch) => (
-                  <TouchableOpacity
-                    key={stretch.name}
-                    style={styles.favoriteItem}
-                    onPress={() => handleSelectFavorite(stretch)}
-                  >
-                    <Text style={styles.favoriteItemText}>{stretch.name}</Text>
-                    <Text style={styles.favoriteItemMuscles}>
-                      {stretch.muscleGroups.slice(0, 2).join(", ")}
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.newStretchButton} onPress={handleNewStretch}>
+              <Text style={styles.newStretchButtonText}>New Stretch</Text>
+            </TouchableOpacity>
+
+            {/* Loved Stretches Section */}
+            <View style={styles.lovedSection}>
+              <TouchableOpacity
+                style={styles.lovedHeader}
+                onPress={() => setShowLoved(!showLoved)}
+              >
+                <Text style={styles.lovedTitle}>
+                  Loved ({lovedStretches.length})
+                </Text>
+                <Text style={styles.chevron}>{showLoved ? "▲" : "▼"}</Text>
+              </TouchableOpacity>
+
+              {showLoved && (
+                <View style={styles.lovedList}>
+                  {lovedStretches.length === 0 ? (
+                    <Text style={styles.noLoved}>
+                      No loved stretches yet. React with 😍 to add one!
                     </Text>
-                  </TouchableOpacity>
-                ))
+                  ) : (
+                    lovedStretches.map((stretch) => (
+                      <TouchableOpacity
+                        key={stretch.id}
+                        style={styles.lovedItem}
+                        onPress={() => handleSelectLoved(stretch)}
+                      >
+                        <Text style={styles.lovedItemText}>{stretch.name}</Text>
+                        <Text style={styles.lovedItemMuscles}>
+                          {stretch.muscleGroups.slice(0, 2).join(", ")}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
               )}
             </View>
-          )}
-        </View>
           </>
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+export default function App() {
+  return (
+    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      <ClerkLoaded>
+        <SignedIn>
+          <MainApp />
+        </SignedIn>
+        <SignedOut>
+          <AuthScreens />
+        </SignedOut>
+      </ClerkLoaded>
+    </ClerkProvider>
   );
 }
 
@@ -176,12 +258,27 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 16,
   },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   title: {
     fontSize: 32,
     fontWeight: "700",
     color: "#1a1a1a",
-    textAlign: "center",
-    marginBottom: 8,
+  },
+  signOutButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: "#f1f5f9",
+    borderRadius: 8,
+  },
+  signOutText: {
+    color: "#64748b",
+    fontSize: 14,
+    fontWeight: "500",
   },
   emptyState: {
     backgroundColor: "#fff",
@@ -250,7 +347,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
   },
-  favoritesSection: {
+  lovedSection: {
     backgroundColor: "#fff",
     borderRadius: 16,
     overflow: "hidden",
@@ -260,13 +357,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  favoritesHeader: {
+  lovedHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     padding: 16,
   },
-  favoritesTitle: {
+  lovedTitle: {
     fontSize: 16,
     fontWeight: "600",
     color: "#1a1a1a",
@@ -275,18 +372,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#64748b",
   },
-  favoritesList: {
+  lovedList: {
     paddingHorizontal: 16,
     paddingBottom: 16,
     gap: 8,
   },
-  noFavorites: {
+  noLoved: {
     fontSize: 14,
     color: "#94a3b8",
     textAlign: "center",
     paddingVertical: 12,
   },
-  favoriteItem: {
+  lovedItem: {
     backgroundColor: "#f8fafc",
     padding: 14,
     borderRadius: 10,
@@ -294,12 +391,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  favoriteItemText: {
+  lovedItemText: {
     fontSize: 15,
     fontWeight: "500",
     color: "#1a1a1a",
   },
-  favoriteItemMuscles: {
+  lovedItemMuscles: {
     fontSize: 13,
     color: "#64748b",
   },

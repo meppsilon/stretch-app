@@ -61,6 +61,55 @@ export interface Database {
           muscle_group_id?: number;
         };
       };
+      stretch_reactions: {
+        Row: {
+          id: number;
+          user_id: string;
+          stretch_id: number;
+          reaction: "love" | "like" | "dislike" | "hate";
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          user_id: string;
+          stretch_id: number;
+          reaction: "love" | "like" | "dislike" | "hate";
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          user_id?: string;
+          stretch_id?: number;
+          reaction?: "love" | "like" | "dislike" | "hate";
+          created_at?: string;
+        };
+      };
+      stretch_history: {
+        Row: {
+          id: number;
+          user_id: string;
+          stretch_id: number;
+          status: "started" | "paused" | "completed" | "abandoned";
+          started_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: number;
+          user_id: string;
+          stretch_id: number;
+          status: "started" | "paused" | "completed" | "abandoned";
+          started_at?: string;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: number;
+          user_id?: string;
+          stretch_id?: number;
+          status?: "started" | "paused" | "completed" | "abandoned";
+          started_at?: string;
+          completed_at?: string | null;
+        };
+      };
     };
   };
 }

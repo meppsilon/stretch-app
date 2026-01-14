@@ -1,25 +1,38 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { Stretch } from "../types";
+import { Stretch, ReactionType } from "../types";
 
 interface StretchCardProps {
   stretch: Stretch;
-  isFavorite: boolean;
-  onToggleFavorite: () => void;
+  reaction: ReactionType;
+  onReaction: (reaction: ReactionType) => void;
 }
+
+const REACTIONS = [
+  { type: "love" as const, emoji: "😍", label: "Love" },
+  { type: "like" as const, emoji: "👍", label: "Like" },
+  { type: "dislike" as const, emoji: "👎", label: "Dislike" },
+  { type: "hate" as const, emoji: "😤", label: "Hate" },
+];
 
 export function StretchCard({
   stretch,
-  isFavorite,
-  onToggleFavorite,
+  reaction,
+  onReaction,
 }: StretchCardProps) {
+  const handleReaction = (type: "love" | "like" | "dislike" | "hate") => {
+    // Toggle off if already selected, otherwise set the reaction
+    if (reaction === type) {
+      onReaction(null);
+    } else {
+      onReaction(type);
+    }
+  };
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.name}>{stretch.name}</Text>
-        <TouchableOpacity onPress={onToggleFavorite} style={styles.favoriteButton}>
-          <Text style={styles.favoriteIcon}>{isFavorite ? "❤️" : "🤍"}</Text>
-        </TouchableOpacity>
       </View>
 
       <View style={styles.tagsContainer}>
@@ -38,6 +51,26 @@ export function StretchCard({
       <View style={styles.durationContainer}>
         <Text style={styles.durationLabel}>Duration:</Text>
         <Text style={styles.durationValue}>{stretch.duration}</Text>
+      </View>
+
+      <View style={styles.reactionsContainer}>
+        {REACTIONS.map(({ type, emoji }) => (
+          <TouchableOpacity
+            key={type}
+            style={[
+              styles.reactionButton,
+              reaction === type && styles.reactionButtonActive,
+            ]}
+            onPress={() => handleReaction(type)}
+          >
+            <Text style={[
+              styles.reactionEmoji,
+              reaction !== type && reaction !== null && styles.reactionEmojiInactive,
+            ]}>
+              {emoji}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
@@ -65,12 +98,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1a1a1a",
     flex: 1,
-  },
-  favoriteButton: {
-    padding: 8,
-  },
-  favoriteIcon: {
-    fontSize: 24,
   },
   tagsContainer: {
     flexDirection: "row",
@@ -117,5 +144,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#2d3748",
+  },
+  reactionsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
+  },
+  reactionButton: {
+    padding: 8,
+    borderRadius: 12,
+    minWidth: 50,
+    alignItems: "center",
+  },
+  reactionButtonActive: {
+    backgroundColor: "#f0f9ff",
+  },
+  reactionEmoji: {
+    fontSize: 28,
+  },
+  reactionEmojiInactive: {
+    opacity: 0.4,
   },
 });
