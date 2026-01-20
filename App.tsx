@@ -18,11 +18,16 @@ import { useStretches } from "./hooks/useStretches";
 import { useTimer } from "./hooks/useTimer";
 import { useReactions } from "./hooks/useReactions";
 import { useStretchHistory } from "./hooks/useStretchHistory";
+import { useUserProfile } from "./hooks/useUserProfile";
 import { StretchCard } from "./components/StretchCard";
 import { Timer } from "./components/Timer";
 import { FilterSection } from "./components/FilterSection";
 import { SignInScreen } from "./components/SignInScreen";
 import { SignUpScreen } from "./components/SignUpScreen";
+import { OnboardingScreen } from "./components/OnboardingScreen";
+import { UserDropdown } from "./components/UserDropdown";
+import { UserProfileScreen } from "./components/UserProfileScreen";
+import { Duration, ExperienceLevel, StretchType, UserProfile } from "./types/userProfile";
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
@@ -36,9 +41,13 @@ function AuthScreens() {
   return <SignInScreen onSwitchToSignUp={() => setShowSignUp(true)} />;
 }
 
-function MainApp() {
+interface MainAppProps {
+  onShowProfile: () => void;
+  onSignOut: () => void;
+}
+
+function MainApp({ onShowProfile, onSignOut }: MainAppProps) {
   const { user } = useUser();
-  const { signOut } = useClerk();
 
   const [currentStretch, setCurrentStretch] = useState<Stretch | null>(null);
   const [filters, setFilters] = useState<Filters>({
@@ -72,7 +81,7 @@ function MainApp() {
     [stretches, lovedStretchIds]
   );
 
-  const timer = useTimer(currentStretch?.seconds ?? 0);
+  const timer = useTimer(currentStretch?.seconds ?? 0, currentStretch?.sides ?? 1);
 
   // Track timer state changes for history
   useEffect(() => {
@@ -122,10 +131,7 @@ function MainApp() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  };
+  const userInitial = user?.firstName?.[0] || user?.emailAddresses?.[0]?.emailAddress?.[0] || "U";
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -136,9 +142,11 @@ function MainApp() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Stretch</Text>
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <Text style={styles.signOutText}>Sign Out</Text>
-          </TouchableOpacity>
+          <UserDropdown
+            userInitial={userInitial}
+            onProfilePress={onShowProfile}
+            onSignOut={onSignOut}
+          />
         </View>
 
         {isLoading ? (
@@ -171,6 +179,9 @@ function MainApp() {
                   timeRemaining={timer.timeRemaining}
                   timerState={timer.timerState}
                   progress={timer.progress}
+                  phase={timer.phase}
+                  currentSide={timer.currentSide}
+                  totalSides={timer.totalSides}
                   onStart={timer.start}
                   onPause={timer.pause}
                   onReset={timer.reset}
@@ -231,12 +242,76 @@ function MainApp() {
   );
 }
 
+function AppContent() {
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const { muscleGroups, isLoading: stretchesLoading } = useStretches();
+  const { profile, onboardingCompleted, isLoading: profileLoading, savePreferences } = useUserProfile(user?.id);
+  const [showProfile, setShowProfile] = useState(false);
+
+  const handleOnboardingComplete = async (preferences: {
+    muscleGroups: string[];
+    duration: Duration;
+    experienceLevel: ExperienceLevel;
+    stretchType: StretchType;
+  }) => {
+    await savePreferences(preferences);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  // Show loading while checking profile status
+  if (profileLoading || stretchesLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color="#6366f1" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show onboarding if not completed
+  if (!onboardingCompleted) {
+    return (
+      <OnboardingScreen
+        muscleGroups={muscleGroups}
+        onComplete={handleOnboardingComplete}
+      />
+    );
+  }
+
+  // Show profile screen
+  if (showProfile) {
+    return (
+      <UserProfileScreen
+        profile={profile}
+        muscleGroups={muscleGroups}
+        onSave={savePreferences}
+        onBack={() => setShowProfile(false)}
+      />
+    );
+  }
+
+  // Show main app
+  return (
+    <MainApp
+      onShowProfile={() => setShowProfile(true)}
+      onSignOut={handleSignOut}
+    />
+  );
+}
+
 export default function App() {
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <ClerkLoaded>
         <SignedIn>
-          <MainApp />
+          <AppContent />
         </SignedIn>
         <SignedOut>
           <AuthScreens />
@@ -268,17 +343,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "700",
     color: "#1a1a1a",
-  },
-  signOutButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: "#f1f5f9",
-    borderRadius: 8,
-  },
-  signOutText: {
-    color: "#64748b",
-    fontSize: 14,
-    fontWeight: "500",
   },
   emptyState: {
     backgroundColor: "#fff",

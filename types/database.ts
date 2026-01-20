@@ -110,6 +110,41 @@ export interface Database {
           completed_at?: string | null;
         };
       };
+      user_profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          onboarding_completed: boolean;
+          preferred_muscle_groups: string[];
+          preferred_duration: "short" | "medium" | "long";
+          experience_level: "beginner" | "intermediate" | "advanced";
+          preferred_stretch_type: "static" | "dynamic" | "all";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          onboarding_completed?: boolean;
+          preferred_muscle_groups?: string[];
+          preferred_duration?: "short" | "medium" | "long";
+          experience_level?: "beginner" | "intermediate" | "advanced";
+          preferred_stretch_type?: "static" | "dynamic" | "all";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          onboarding_completed?: boolean;
+          preferred_muscle_groups?: string[];
+          preferred_duration?: "short" | "medium" | "long";
+          experience_level?: "beginner" | "intermediate" | "advanced";
+          preferred_stretch_type?: "static" | "dynamic" | "all";
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
   };
 }

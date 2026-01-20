@@ -6,6 +6,7 @@ export interface Stretch {
   dynamic: boolean;
   duration: string;
   description: string;
+  sides: number; // 1 = single side, 2 = both sides (left/right)
 }
 
 export interface Filters {

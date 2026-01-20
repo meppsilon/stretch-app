@@ -19,6 +19,7 @@ interface StretchQueryResult {
   dynamic: boolean;
   duration: string;
   description: string;
+  sides: number;
   created_at: string;
   muscle_groups: Array<{
     muscle_group: {
@@ -74,6 +75,7 @@ export function useStretches(): UseStretchesReturn {
           dynamic: row.dynamic,
           duration: row.duration,
           description: row.description,
+          sides: row.sides ?? 1, // Default to 1 side if not set
         } as Stretch;
       });
 

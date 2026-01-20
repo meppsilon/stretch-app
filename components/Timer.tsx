@@ -3,11 +3,15 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from "reac
 import Svg, { Circle } from "react-native-svg";
 import { Audio } from "expo-av";
 import { TimerState } from "../types";
+import { TimerPhase } from "../hooks/useTimer";
 
 interface TimerProps {
   timeRemaining: number;
   timerState: TimerState;
   progress: number;
+  phase: TimerPhase;
+  currentSide: number;
+  totalSides: number;
   onStart: () => void;
   onPause: () => void;
   onReset: () => void;
@@ -24,6 +28,9 @@ export function Timer({
   timeRemaining,
   timerState,
   progress,
+  phase,
+  currentSide,
+  totalSides,
   onStart,
   onPause,
   onReset,
@@ -71,6 +78,13 @@ export function Timer({
     }
   }, [timerState]);
 
+  // Play sound when switching sides
+  useEffect(() => {
+    if (phase === "switching" && timerState === "running") {
+      playSwitchSound();
+    }
+  }, [phase, timerState]);
+
   // Cleanup sound on unmount
   useEffect(() => {
     return () => {
@@ -104,6 +118,29 @@ export function Timer({
     }
   };
 
+  const playSwitchSound = async () => {
+    try {
+      // Unload previous sound if exists
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+      }
+
+      // Set audio mode for playback
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+      });
+
+      // Use a notification sound for switching
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: "https://cdn.freesound.org/previews/352/352661_5450487-lq.mp3" },
+        { shouldPlay: true, volume: 0.8 }
+      );
+      soundRef.current = sound;
+    } catch (error) {
+      console.log("Could not play switch sound:", error);
+    }
+  };
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -111,6 +148,9 @@ export function Timer({
   };
 
   const getStatusColor = () => {
+    if (phase === "switching" && timerState === "running") {
+      return "#f97316"; // Orange for switching
+    }
     switch (timerState) {
       case "running":
         return "#10b981";
@@ -124,15 +164,18 @@ export function Timer({
   };
 
   const getStatusText = () => {
+    if (phase === "switching" && timerState === "running") {
+      return "Switch sides!";
+    }
     switch (timerState) {
       case "running":
-        return "Running";
+        return totalSides === 2 ? `Side ${currentSide} of ${totalSides}` : "Running";
       case "paused":
         return "Paused";
       case "finished":
         return "Complete!";
       default:
-        return "Ready";
+        return totalSides === 2 ? `Side 1 of ${totalSides}` : "Ready";
     }
   };
 
