@@ -9,7 +9,7 @@ interface UseStretchesReturn {
   error: string | null;
   refetch: () => Promise<void>;
   filterStretches: (filters: Filters) => Stretch[];
-  getRandomStretch: (filtered: Stretch[]) => Stretch | null;
+  getRandomStretch: (filtered: Stretch[], preferredMuscleGroups?: string[]) => Stretch | null;
 }
 
 interface StretchQueryResult {
@@ -123,9 +123,35 @@ export function useStretches(): UseStretchesReturn {
   );
 
   const getRandomStretch = useCallback(
-    (filtered: Stretch[]): Stretch | null => {
+    (filtered: Stretch[], preferredMuscleGroups?: string[]): Stretch | null => {
       if (filtered.length === 0) return null;
-      return filtered[Math.floor(Math.random() * filtered.length)];
+
+      // If no preferences, use uniform random selection
+      if (!preferredMuscleGroups || preferredMuscleGroups.length === 0) {
+        return filtered[Math.floor(Math.random() * filtered.length)];
+      }
+
+      // Weighted selection: stretches matching preferred muscle groups get 2x weight
+      const weights = filtered.map((stretch) => {
+        const matchesPreferred = stretch.muscleGroups.some((mg) =>
+          preferredMuscleGroups.includes(mg)
+        );
+        return matchesPreferred ? 2 : 1;
+      });
+      console.log("weights", weights);
+
+      const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+      let random = Math.random() * totalWeight;
+
+      for (let i = 0; i < filtered.length; i++) {
+        random -= weights[i];
+        if (random <= 0) {
+          return filtered[i];
+        }
+      }
+
+      // Fallback (shouldn't reach here)
+      return filtered[filtered.length - 1];
     },
     []
   );

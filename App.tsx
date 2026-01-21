@@ -44,9 +44,10 @@ function AuthScreens() {
 interface MainAppProps {
   onShowProfile: () => void;
   onSignOut: () => void;
+  preferredMuscleGroups: string[];
 }
 
-function MainApp({ onShowProfile, onSignOut }: MainAppProps) {
+function MainApp({ onShowProfile, onSignOut, preferredMuscleGroups }: MainAppProps) {
   const { user } = useUser();
 
   const [currentStretch, setCurrentStretch] = useState<Stretch | null>(null);
@@ -75,11 +76,39 @@ function MainApp({ onShowProfile, onSignOut }: MainAppProps) {
     [filters, filterStretches]
   );
 
+  // Filter out stretches completed in the last 24 hours
+  const availableStretches = useMemo(
+    () => filteredStretches.filter((s) => !stretchHistory.recentlyCompletedIds.has(s.id)),
+    [filteredStretches, stretchHistory.recentlyCompletedIds]
+  );
+
   const lovedStretchIds = getStretchesByReaction("love");
   const lovedStretches = useMemo(
     () => stretches.filter((s) => lovedStretchIds.includes(s.id)),
     [stretches, lovedStretchIds]
   );
+
+  // Restore incomplete stretch session on load
+  useEffect(() => {
+    if (
+      stretchHistory.incompleteStretchId &&
+      !stretchHistory.isLoadingIncomplete &&
+      stretches.length > 0 &&
+      !currentStretch
+    ) {
+      const incompleteStretch = stretches.find(
+        (s) => s.id === stretchHistory.incompleteStretchId
+      );
+      if (incompleteStretch) {
+        setCurrentStretch(incompleteStretch);
+      }
+    }
+  }, [
+    stretchHistory.incompleteStretchId,
+    stretchHistory.isLoadingIncomplete,
+    stretches,
+    currentStretch,
+  ]);
 
   const timer = useTimer(currentStretch?.seconds ?? 0, currentStretch?.sides ?? 1);
 
@@ -113,7 +142,7 @@ function MainApp({ onShowProfile, onSignOut }: MainAppProps) {
       stretchHistory.abandonSession();
     }
 
-    const stretch = getRandomStretch(filteredStretches);
+    const stretch = getRandomStretch(availableStretches, preferredMuscleGroups);
     setCurrentStretch(stretch);
     timer.reset();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -164,7 +193,7 @@ function MainApp({ onShowProfile, onSignOut }: MainAppProps) {
             <FilterSection
               filters={filters}
               onFiltersChange={setFilters}
-              matchCount={filteredStretches.length}
+              matchCount={availableStretches.length}
               muscleGroups={muscleGroups}
             />
 
@@ -302,6 +331,7 @@ function AppContent() {
     <MainApp
       onShowProfile={() => setShowProfile(true)}
       onSignOut={handleSignOut}
+      preferredMuscleGroups={profile?.preferred_muscle_groups ?? []}
     />
   );
 }
