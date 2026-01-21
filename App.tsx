@@ -119,8 +119,8 @@ function MainApp({ onShowProfile, onSignOut, preferredMuscleGroups }: MainAppPro
 
     if (prevState !== currentState && currentStretch) {
       if (currentState === "running" && prevState === "idle") {
-        // Started a new session
-        stretchHistory.startSession(currentStretch.id);
+        // Started the timer - update unstarted session to started
+        stretchHistory.startSession();
       } else if (currentState === "paused") {
         // Paused
         stretchHistory.updateStatus("paused");
@@ -137,23 +137,17 @@ function MainApp({ onShowProfile, onSignOut, preferredMuscleGroups }: MainAppPro
   }, [timer.timerState, currentStretch, stretchHistory]);
 
   const handleNewStretch = () => {
-    // Abandon current session if timer was running
-    if (currentStretch && (timer.timerState === "running" || timer.timerState === "paused")) {
-      stretchHistory.abandonSession();
-    }
-
     const stretch = getRandomStretch(availableStretches, preferredMuscleGroups);
+    if (stretch) {
+      stretchHistory.recordStretchAttempt(stretch.id);
+    }
     setCurrentStretch(stretch);
     timer.reset();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   const handleSelectLoved = (stretch: Stretch) => {
-    // Abandon current session if timer was running
-    if (currentStretch && (timer.timerState === "running" || timer.timerState === "paused")) {
-      stretchHistory.abandonSession();
-    }
-
+    stretchHistory.recordStretchAttempt(stretch.id);
     setCurrentStretch(stretch);
     timer.reset();
     setShowLoved(false);

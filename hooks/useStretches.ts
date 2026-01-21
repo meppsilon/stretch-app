@@ -138,7 +138,6 @@ export function useStretches(): UseStretchesReturn {
         );
         return matchesPreferred ? 2 : 1;
       });
-      console.log("weights", weights);
 
       const totalWeight = weights.reduce((sum, w) => sum + w, 0);
       let random = Math.random() * totalWeight;

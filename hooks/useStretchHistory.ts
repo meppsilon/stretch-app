@@ -7,10 +7,11 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 // Use untyped client for stretch_history table until types are regenerated
 const supabaseUntyped = createClient(supabaseUrl, supabaseAnonKey);
 
-type StretchStatus = "started" | "paused" | "completed" | "abandoned";
+type StretchStatus = "unstarted" | "started" | "paused" | "completed" | "abandoned";
 
 interface UseStretchHistoryReturn {
-  startSession: (stretchId: number) => Promise<void>;
+  recordStretchAttempt: (stretchId: number) => Promise<void>;
+  startSession: () => Promise<void>;
   updateStatus: (status: StretchStatus) => Promise<void>;
   abandonSession: () => Promise<void>;
   completeSession: () => Promise<void>;
@@ -95,13 +96,24 @@ export function useStretchHistory(userId: string | undefined): UseStretchHistory
     fetchIncompleteSession();
   }, [userId]);
 
-  const startSession = useCallback(
+  const recordStretchAttempt = useCallback(
     async (stretchId: number) => {
       if (!userId) return;
 
-      // If there's an existing session, abandon it first
+      // If there's an existing unstarted session, leave it as unstarted
+      // If there's a started/paused session, abandon it
       if (currentSessionRef.current) {
-        await updateSessionStatus("abandoned");
+        const { data } = await supabaseUntyped
+          .from("stretch_history")
+          .select("status")
+          .eq("id", currentSessionRef.current)
+          .single();
+
+        if (data?.status === "started" || data?.status === "paused") {
+          await updateSessionStatus("abandoned");
+        }
+        // Unstarted sessions remain as "unstarted" - no action needed
+        currentSessionRef.current = null;
       }
 
       try {
@@ -110,23 +122,30 @@ export function useStretchHistory(userId: string | undefined): UseStretchHistory
           .insert({
             user_id: userId,
             stretch_id: stretchId,
-            status: "started",
+            status: "unstarted",
           })
           .select("id")
           .single();
 
         if (error) {
-          console.error("Error starting stretch session:", error);
+          console.error("Error recording stretch attempt:", error);
           return;
         }
 
         currentSessionRef.current = data?.id;
       } catch (error) {
-        console.error("Error starting stretch session:", error);
+        console.error("Error recording stretch attempt:", error);
       }
     },
     [userId]
   );
+
+  const startSession = useCallback(async () => {
+    if (!currentSessionRef.current) return;
+
+    // Update the current unstarted session to started
+    await updateSessionStatus("started");
+  }, []);
 
   const updateSessionStatus = async (status: StretchStatus) => {
     if (!currentSessionRef.current) return;
@@ -174,6 +193,7 @@ export function useStretchHistory(userId: string | undefined): UseStretchHistory
   }, [fetchRecentlyCompleted]);
 
   return {
+    recordStretchAttempt,
     startSession,
     updateStatus,
     abandonSession,
