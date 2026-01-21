@@ -72,7 +72,7 @@ export function useStretchHistory(userId: string | undefined): UseStretchHistory
           .from("stretch_history")
           .select("id, stretch_id")
           .eq("user_id", userId)
-          .in("status", ["started", "paused"])
+          .in("status", ["started", "paused", "unstarted"])
           .order("started_at", { ascending: false })
           .limit(1)
           .single();
