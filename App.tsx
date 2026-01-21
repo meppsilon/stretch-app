@@ -61,7 +61,7 @@ function MainApp({ onShowProfile, onSignOut, preferredMuscleGroups }: MainAppPro
 
   const {
     stretches,
-    muscleGroups,
+    muscleGroupNames,
     isLoading,
     error,
     filterStretches,
@@ -188,7 +188,7 @@ function MainApp({ onShowProfile, onSignOut, preferredMuscleGroups }: MainAppPro
               filters={filters}
               onFiltersChange={setFilters}
               matchCount={availableStretches.length}
-              muscleGroups={muscleGroups}
+              muscleGroups={muscleGroupNames}
             />
 
             {currentStretch ? (
@@ -268,18 +268,24 @@ function MainApp({ onShowProfile, onSignOut, preferredMuscleGroups }: MainAppPro
 function AppContent() {
   const { user } = useUser();
   const { signOut } = useClerk();
-  const { muscleGroups, isLoading: stretchesLoading } = useStretches();
+  const { muscleGroups, muscleGroupNames, getMuscleGroupNames, isLoading: stretchesLoading } = useStretches();
   const { profile, onboardingCompleted, isLoading: profileLoading, savePreferences } = useUserProfile(user?.id);
   const [showProfile, setShowProfile] = useState(false);
 
   const handleOnboardingComplete = async (preferences: {
-    muscleGroups: string[];
+    muscleGroupIds: number[];
     duration: Duration;
     experienceLevel: ExperienceLevel;
     stretchType: StretchType;
   }) => {
     await savePreferences(preferences);
   };
+
+  // Convert preferred muscle group IDs to names for weighted selection
+  const preferredMuscleGroupNames = useMemo(
+    () => getMuscleGroupNames(profile?.preferred_muscle_groups ?? []),
+    [getMuscleGroupNames, profile?.preferred_muscle_groups]
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -325,7 +331,7 @@ function AppContent() {
     <MainApp
       onShowProfile={() => setShowProfile(true)}
       onSignOut={handleSignOut}
-      preferredMuscleGroups={profile?.preferred_muscle_groups ?? []}
+      preferredMuscleGroups={preferredMuscleGroupNames}
     />
   );
 }

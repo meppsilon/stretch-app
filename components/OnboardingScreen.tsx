@@ -10,11 +10,12 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { Duration, ExperienceLevel, StretchType } from "../types/userProfile";
+import { MuscleGroup } from "../hooks/useStretches";
 
 interface OnboardingScreenProps {
-  muscleGroups: string[];
+  muscleGroups: MuscleGroup[];
   onComplete: (preferences: {
-    muscleGroups: string[];
+    muscleGroupIds: number[];
     duration: Duration;
     experienceLevel: ExperienceLevel;
     stretchType: StretchType;
@@ -41,7 +42,7 @@ const STRETCH_TYPE_OPTIONS: { value: StretchType; label: string; description: st
 
 export function OnboardingScreen({ muscleGroups, onComplete }: OnboardingScreenProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<string[]>([]);
+  const [selectedMuscleGroupIds, setSelectedMuscleGroupIds] = useState<number[]>([]);
   const [selectedDuration, setSelectedDuration] = useState<Duration>("medium");
   const [selectedExperience, setSelectedExperience] = useState<ExperienceLevel>("beginner");
   const [selectedStretchType, setSelectedStretchType] = useState<StretchType>("all");
@@ -49,10 +50,10 @@ export function OnboardingScreen({ muscleGroups, onComplete }: OnboardingScreenP
 
   const totalSteps = 4;
 
-  const toggleMuscleGroup = (group: string) => {
+  const toggleMuscleGroup = (id: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedMuscleGroups((prev) =>
-      prev.includes(group) ? prev.filter((g) => g !== group) : [...prev, group]
+    setSelectedMuscleGroupIds((prev) =>
+      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
     );
   };
 
@@ -75,7 +76,7 @@ export function OnboardingScreen({ muscleGroups, onComplete }: OnboardingScreenP
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     try {
       await onComplete({
-        muscleGroups: selectedMuscleGroups,
+        muscleGroupIds: selectedMuscleGroupIds,
         duration: selectedDuration,
         experienceLevel: selectedExperience,
         stretchType: selectedStretchType,
@@ -107,20 +108,20 @@ export function OnboardingScreen({ muscleGroups, onComplete }: OnboardingScreenP
       <View style={styles.muscleGroupGrid}>
         {muscleGroups.map((group) => (
           <TouchableOpacity
-            key={group}
+            key={group.id}
             style={[
               styles.muscleGroupChip,
-              selectedMuscleGroups.includes(group) && styles.muscleGroupChipSelected,
+              selectedMuscleGroupIds.includes(group.id) && styles.muscleGroupChipSelected,
             ]}
-            onPress={() => toggleMuscleGroup(group)}
+            onPress={() => toggleMuscleGroup(group.id)}
           >
             <Text
               style={[
                 styles.muscleGroupChipText,
-                selectedMuscleGroups.includes(group) && styles.muscleGroupChipTextSelected,
+                selectedMuscleGroupIds.includes(group.id) && styles.muscleGroupChipTextSelected,
               ]}
             >
-              {group}
+              {group.name}
             </Text>
           </TouchableOpacity>
         ))}

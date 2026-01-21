@@ -115,7 +115,7 @@ export interface Database {
           id: string;
           user_id: string;
           onboarding_completed: boolean;
-          preferred_muscle_groups: string[];
+          preferred_muscle_groups: number[];
           preferred_duration: "short" | "medium" | "long";
           experience_level: "beginner" | "intermediate" | "advanced";
           preferred_stretch_type: "static" | "dynamic" | "all";
@@ -126,7 +126,7 @@ export interface Database {
           id?: string;
           user_id: string;
           onboarding_completed?: boolean;
-          preferred_muscle_groups?: string[];
+          preferred_muscle_groups?: number[];
           preferred_duration?: "short" | "medium" | "long";
           experience_level?: "beginner" | "intermediate" | "advanced";
           preferred_stretch_type?: "static" | "dynamic" | "all";
@@ -137,7 +137,7 @@ export interface Database {
           id?: string;
           user_id?: string;
           onboarding_completed?: boolean;
-          preferred_muscle_groups?: string[];
+          preferred_muscle_groups?: number[];
           preferred_duration?: "short" | "medium" | "long";
           experience_level?: "beginner" | "intermediate" | "advanced";
           preferred_stretch_type?: "static" | "dynamic" | "all";

@@ -6,7 +6,7 @@ export interface UserProfile {
   id: string;
   user_id: string;
   onboarding_completed: boolean;
-  preferred_muscle_groups: string[];
+  preferred_muscle_groups: number[];
   preferred_duration: Duration;
   experience_level: ExperienceLevel;
   preferred_stretch_type: StretchType;
@@ -16,7 +16,7 @@ export interface UserProfile {
 
 export interface UserProfileUpdate {
   onboarding_completed?: boolean;
-  preferred_muscle_groups?: string[];
+  preferred_muscle_groups?: number[];
   preferred_duration?: Duration;
   experience_level?: ExperienceLevel;
   preferred_stretch_type?: StretchType;

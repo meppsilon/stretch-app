@@ -10,12 +10,13 @@ import {
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { UserProfile, Duration, ExperienceLevel, StretchType } from "../types/userProfile";
+import { MuscleGroup } from "../hooks/useStretches";
 
 interface UserProfileScreenProps {
   profile: UserProfile | null;
-  muscleGroups: string[];
+  muscleGroups: MuscleGroup[];
   onSave: (preferences: {
-    muscleGroups: string[];
+    muscleGroupIds: number[];
     duration: Duration;
     experienceLevel: ExperienceLevel;
     stretchType: StretchType;
@@ -47,7 +48,7 @@ export function UserProfileScreen({
   onSave,
   onBack,
 }: UserProfileScreenProps) {
-  const [selectedMuscleGroups, setSelectedMuscleGroups] = useState<string[]>(
+  const [selectedMuscleGroupIds, setSelectedMuscleGroupIds] = useState<number[]>(
     profile?.preferred_muscle_groups ?? []
   );
   const [selectedDuration, setSelectedDuration] = useState<Duration>(
@@ -62,10 +63,10 @@ export function UserProfileScreen({
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const toggleMuscleGroup = (group: string) => {
+  const toggleMuscleGroup = (id: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSelectedMuscleGroups((prev) =>
-      prev.includes(group) ? prev.filter((g) => g !== group) : [...prev, group]
+    setSelectedMuscleGroupIds((prev) =>
+      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
     );
   };
 
@@ -75,7 +76,7 @@ export function UserProfileScreen({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const success = await onSave({
-      muscleGroups: selectedMuscleGroups,
+      muscleGroupIds: selectedMuscleGroupIds,
       duration: selectedDuration,
       experienceLevel: selectedExperience,
       stretchType: selectedStretchType,
@@ -109,20 +110,20 @@ export function UserProfileScreen({
           <View style={styles.muscleGroupGrid}>
             {muscleGroups.map((group) => (
               <TouchableOpacity
-                key={group}
+                key={group.id}
                 style={[
                   styles.muscleGroupChip,
-                  selectedMuscleGroups.includes(group) && styles.muscleGroupChipSelected,
+                  selectedMuscleGroupIds.includes(group.id) && styles.muscleGroupChipSelected,
                 ]}
-                onPress={() => toggleMuscleGroup(group)}
+                onPress={() => toggleMuscleGroup(group.id)}
               >
                 <Text
                   style={[
                     styles.muscleGroupChipText,
-                    selectedMuscleGroups.includes(group) && styles.muscleGroupChipTextSelected,
+                    selectedMuscleGroupIds.includes(group.id) && styles.muscleGroupChipTextSelected,
                   ]}
                 >
-                  {group}
+                  {group.name}
                 </Text>
               </TouchableOpacity>
             ))}

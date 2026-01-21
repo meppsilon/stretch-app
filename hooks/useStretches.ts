@@ -1,15 +1,22 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { Stretch, Filters } from "../types";
 
+export interface MuscleGroup {
+  id: number;
+  name: string;
+}
+
 interface UseStretchesReturn {
   stretches: Stretch[];
-  muscleGroups: string[];
+  muscleGroups: MuscleGroup[];
+  muscleGroupNames: string[];
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
   filterStretches: (filters: Filters) => Stretch[];
   getRandomStretch: (filtered: Stretch[], preferredMuscleGroups?: string[]) => Stretch | null;
+  getMuscleGroupNames: (ids: number[]) => string[];
 }
 
 interface StretchQueryResult {
@@ -31,7 +38,7 @@ interface StretchQueryResult {
 
 export function useStretches(): UseStretchesReturn {
   const [stretches, setStretches] = useState<Stretch[]>([]);
-  const [allMuscleGroups, setAllMuscleGroups] = useState<string[]>([]);
+  const [allMuscleGroups, setAllMuscleGroups] = useState<MuscleGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +63,7 @@ export function useStretches(): UseStretchesReturn {
       // Fetch all muscle groups for the filter dropdown
       const { data: muscleGroupData, error: muscleGroupError } = await supabase
         .from("muscle_groups")
-        .select("name")
+        .select("id, name")
         .order("name");
 
       if (muscleGroupError) throw muscleGroupError;
@@ -80,7 +87,12 @@ export function useStretches(): UseStretchesReturn {
       });
 
       setStretches(transformedStretches);
-      setAllMuscleGroups((muscleGroupData || []).map((mg: { name: string }) => mg.name));
+      setAllMuscleGroups(
+        (muscleGroupData || []).map((mg: { id: number; name: string }) => ({
+          id: mg.id,
+          name: mg.name,
+        }))
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch stretches");
       console.error("Error fetching stretches:", err);
@@ -155,13 +167,31 @@ export function useStretches(): UseStretchesReturn {
     []
   );
 
+  // Convert muscle group IDs to names
+  const getMuscleGroupNames = useCallback(
+    (ids: number[]): string[] => {
+      return ids
+        .map((id) => allMuscleGroups.find((mg) => mg.id === id)?.name)
+        .filter((name): name is string => Boolean(name));
+    },
+    [allMuscleGroups]
+  );
+
+  // Memoized list of muscle group names for backwards compatibility
+  const muscleGroupNames = useMemo(
+    () => allMuscleGroups.map((mg) => mg.name),
+    [allMuscleGroups]
+  );
+
   return {
     stretches,
     muscleGroups: allMuscleGroups,
+    muscleGroupNames,
     isLoading,
     error,
     refetch: fetchData,
     filterStretches,
     getRandomStretch,
+    getMuscleGroupNames,
   };
 }

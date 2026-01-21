@@ -18,7 +18,7 @@ interface UseUserProfileReturn {
   error: string | null;
   onboardingCompleted: boolean;
   savePreferences: (preferences: {
-    muscleGroups: string[];
+    muscleGroupIds: number[];
     duration: Duration;
     experienceLevel: ExperienceLevel;
     stretchType: StretchType;
@@ -73,7 +73,7 @@ export function useUserProfile(userId: string | undefined): UseUserProfileReturn
 
   const savePreferences = useCallback(
     async (preferences: {
-      muscleGroups: string[];
+      muscleGroupIds: number[];
       duration: Duration;
       experienceLevel: ExperienceLevel;
       stretchType: StretchType;
@@ -84,7 +84,7 @@ export function useUserProfile(userId: string | undefined): UseUserProfileReturn
         const profileData = {
           user_id: userId,
           onboarding_completed: true,
-          preferred_muscle_groups: preferences.muscleGroups,
+          preferred_muscle_groups: preferences.muscleGroupIds,
           preferred_duration: preferences.duration,
           experience_level: preferences.experienceLevel,
           preferred_stretch_type: preferences.stretchType,
